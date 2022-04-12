@@ -7,10 +7,13 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Handler;
+import java.util.stream.Collectors;
 
 public class Server {
     private final ExecutorService pool = Executors.newFixedThreadPool(64);
     private final List<String> validPaths = List.of("/index.html", "/spring.svg", "/spring.png", "/resources.html", "/styles.css", "/app.js", "/links.html", "/forms.html", "/classic.html", "/events.html", "/events.js");
+    private final Map<String, Map<String, MyHandler>> handlers = new HashMap<>();
 
     public void listen(int port) {
         try (final var serverSocket = new ServerSocket(port)) {
@@ -94,6 +97,20 @@ public class Server {
             out.flush();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void addHandler(String method, String path, MyHandler handler) {
+        Map<String, MyHandler> newMap = new HashMap<>();
+        newMap.put(path, handler);
+
+        if (!handlers.containsKey(method)) {
+            handlers.put(method, newMap);
+        } else {
+            handlers.entrySet().stream()
+                    .filter(s -> s.getKey().equals(method))
+                    .map(Map.Entry::getValue)
+                    .findAny().ifPresent(editMap -> editMap.put(path, handler));
         }
     }
 }
