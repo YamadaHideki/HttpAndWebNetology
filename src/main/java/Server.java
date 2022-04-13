@@ -1,9 +1,16 @@
+import org.apache.hc.core5.net.URLEncodedUtils;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
 
 public class Server {
     private final ExecutorService pool = Executors.newFixedThreadPool(64);
@@ -21,7 +28,7 @@ public class Server {
                     final var socket = serverSocket.accept();
                         pool.submit(() -> {
                             connectHandler(socket);
-                            System.out.println("Socket isClosed: " + socket.isClosed());
+                            System.out.println("Socket closed: " + socket.isClosed());
                         });
                 } catch (IOException e){
                     e.printStackTrace();
@@ -44,10 +51,10 @@ public class Server {
 
             final var parts = requestLine.split(" ");
             final var method = parts[0];
-            final var path = parts[1];
+            final var pathQuery = parts[1];
+            final var pathWithoutQuery = pathQuery.split(Pattern.quote("?"))[0];
 
-            System.out.println(method + ", " + path);
-            final var headers = in.readLine();
+            System.out.println(method + ", " + pathWithoutQuery);
 
             if (parts.length != 3) {
                 // just close socket
@@ -56,6 +63,13 @@ public class Server {
 
             Request request = new Request();
             request.setMethod(parts[0]);
+
+            try {
+                var params = URLEncodedUtils.parse(new URI(pathQuery), StandardCharsets.UTF_8);
+                request.setParams(params);
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+            }
 
             // обработка headers
             while (in.ready()) {
@@ -76,9 +90,9 @@ public class Server {
                     .filter(s -> s.getKey().equals(method))
                     .map(Map.Entry::getValue)
                     .findAny()
-                    .filter(s -> s.containsKey(path))
+                    .filter(s -> s.containsKey(pathWithoutQuery))
                     .ifPresentOrElse(
-                            s -> s.get(path).handle(request, out),
+                            s -> s.get(pathWithoutQuery).handle(request, out),
                             () -> pageNotFound(out)
                     );
 
