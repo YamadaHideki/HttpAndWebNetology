@@ -6,7 +6,7 @@ public class Main {
         var server = new Server();
 
         server.addHandler("GET", "/messages", (request, responseStream) -> {
-            var response = "{method: \"GET\"}";
+            var response = "{\"method\": \"GET\"}";
 
             try {
                 responseStream.write(
@@ -27,7 +27,7 @@ public class Main {
         });
 
         server.addHandler("POST", "/messages", ((request, responseStream) -> {
-            var response = "{method: \"POST\"}";
+            var response = "{\"method\": \"POST\"}";
 
             try {
                 responseStream.write(

@@ -21,7 +21,7 @@ public class Server {
                     final var socket = serverSocket.accept();
                         pool.submit(() -> {
                             connectHandler(socket);
-                            System.out.println("Socket isClosed: " + socket.isClosed());
+                            System.out.println("Socket closed: " + socket.isClosed());
                         });
                 } catch (IOException e){
                     e.printStackTrace();
@@ -47,7 +47,6 @@ public class Server {
             final var path = parts[1];
 
             System.out.println(method + ", " + path);
-            final var headers = in.readLine();
 
             if (parts.length != 3) {
                 // just close socket
