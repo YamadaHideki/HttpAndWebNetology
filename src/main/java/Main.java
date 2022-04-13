@@ -42,7 +42,7 @@ public class Main {
         });
 
         server.addHandler("POST", "/messages", ((request, responseStream) -> {
-            var response = "{method: \"POST\"}";
+            var response = "{\"method\": \"POST\"}";
 
             try {
                 responseStream.write(
