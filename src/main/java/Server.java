@@ -1,4 +1,5 @@
 import org.apache.hc.core5.net.URLEncodedUtils;
+import org.apache.hc.core5.util.ByteArrayBuffer;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -44,9 +45,9 @@ public class Server {
              final var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              final var out = new BufferedOutputStream(socket.getOutputStream())
         ) {
+
             // read only request line for simplicity
             // must be in form GET /path HTTP/1.1
-
             final var requestLine = in.readLine();
 
             final var parts = requestLine.split(" ");
@@ -81,10 +82,38 @@ public class Server {
                 request.addHeader(lineAsKeyValue[0], lineAsKeyValue[1]);
             }
 
-            // обработка body
-            while (in.ready()) {
-                request.addBody(in.readLine());
+            var valueContentType = request.getHeaderValueByKey("Content-Type");
+            System.out.println("VALUE_CONTENT_TYPE: " + valueContentType);
+            if (valueContentType != null) {
+                switch (valueContentType.trim()) {
+                    case "application/x-www-form-urlencoded":
+                        StringBuilder sb = new StringBuilder();
+                        while (in.ready()) {
+                            sb.append(in.readLine());
+                        }
+                        var parseBody = sb.toString().split(Pattern.quote("&"));
+                        for (String s : parseBody) {
+                            var split = s.split("=");
+                            request.addPostParam(split[0], split[1]);
+                        }
+                        break;
+                    default:
+                        System.out.println("DEFAULT");
+                        while (in.ready()) {
+                            request.addBody(in.readLine());
+                        }
+                        break;
+                }
+            } else {
+                while (in.ready()) {
+                    request.addBody(in.readLine());
+                }
             }
+
+
+
+
+            System.out.println(request.toString());
 
             handlers.entrySet().stream()
                     .filter(s -> s.getKey().equals(method))
