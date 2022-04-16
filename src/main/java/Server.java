@@ -1,3 +1,9 @@
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
+import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.RequestContext;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.fileupload.util.Streams;
 import org.apache.hc.core5.net.URLEncodedUtils;
 
 import java.io.*;
@@ -84,7 +90,7 @@ public class Server {
             System.out.println("VALUE_CONTENT_TYPE: " + valueContentType);
 
             if (valueContentType != null) {
-                switch (valueContentType.trim()) {
+                switch (valueContentType.trim().split(Pattern.quote(";"))[0]) {
                     case "application/x-www-form-urlencoded":
                         sb.setLength(0);
 
@@ -100,12 +106,16 @@ public class Server {
 
                         String[] parseBody = sb.toString().split(Pattern.quote("&"));
                         for (String s : parseBody) {
-                            String[] split = URLDecoder.decode(s, StandardCharsets.UTF_8).split("=");
-                            if (split.length > 1) {
-                                request.addPostParam(split[0], split[1]);
-                            } else {
-                                badRequest(out);
-                                return;
+                            if (!s.equals("") && s.length() > 1) {
+                                String[] split = URLDecoder.decode(s, StandardCharsets.UTF_8).split("=");
+                                if (split.length == 2) {
+                                    request.addPostParam(split[0], split[1]);
+                                } else if (split.length == 1) {
+                                    request.addPostParam(split[0], "");
+                                } else {
+                                    badRequest(out);
+                                    return;
+                                }
                             }
                         }
                         break;
@@ -113,10 +123,27 @@ public class Server {
                         sb.setLength(0);
 
                         while (in.ready()) {
-                            sb.append(in.readLine());
+                            request.addBody(in.readLine());
                         }
 
-                        System.out.println(sb.toString());
+                        ServletFileUpload upload = new ServletFileUpload();
+                        // Parse the request
+                        FileItemIterator iter = upload.getItemIterator(request);
+                        while (iter.hasNext()) {
+                            FileItemStream item = iter.next();
+                            String name = item.getFieldName();
+                            InputStream stream = item.openStream();
+                            if (item.isFormField()) {
+                                System.out.println("Form field " + name + " with value "
+                                        + Streams.asString(stream) + " detected.");
+                            } else {
+                                System.out.println("File field " + name + " with file name "
+                                        + item.getName() + " detected.");
+                                // Process the input stream
+                            }
+                        }
+
+                        //System.out.println(sb.toString());
 
                         break;
                     default:
@@ -143,6 +170,8 @@ public class Server {
             out.flush();
 
         } catch (IOException e) {
+            e.printStackTrace();
+        } catch (FileUploadException e) {
             e.printStackTrace();
         }
     }

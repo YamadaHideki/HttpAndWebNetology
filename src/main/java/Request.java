@@ -1,9 +1,14 @@
+import org.apache.commons.fileupload.RequestContext;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-public class Request {
+public class Request implements RequestContext {
 
     private String method;
     private Map<String, String> headers = new HashMap<>();
@@ -98,5 +103,25 @@ public class Request {
         sb.append("}\r\n");
 
         return sb.toString();
+    }
+
+    @Override
+    public String getCharacterEncoding() {
+        return StandardCharsets.UTF_8.displayName();
+    }
+
+    @Override
+    public String getContentType() {
+        return getHeaderValueByKey("Content-Type").trim();
+    }
+
+    @Override
+    public int getContentLength() {
+        return Integer.parseInt(getHeaderValueByKey("Content-Length").trim());
+    }
+
+    @Override
+    public InputStream getInputStream() throws IOException {
+        return new ByteArrayInputStream(body.toString().getBytes());
     }
 }
