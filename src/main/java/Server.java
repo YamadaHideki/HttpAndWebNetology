@@ -1,12 +1,8 @@
 import org.apache.hc.core5.net.URLEncodedUtils;
-import org.apache.hc.core5.util.ByteArrayBuffer;
 
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -16,6 +12,8 @@ import java.util.regex.Pattern;
 public class Server {
     private final ExecutorService pool = Executors.newFixedThreadPool(64);
     private final Map<String, Map<String, MyHandler>> handlers = new HashMap<>();
+    private final String HTTP_VERSION = "HTTP/1.1";
+    private final StringBuilder sb = new StringBuilder();
 
     public Server() {
         handlers.put("GET", new HashMap<>());
@@ -29,7 +27,7 @@ public class Server {
                     final var socket = serverSocket.accept();
                         pool.submit(() -> {
                             connectHandler(socket);
-                            System.out.println("Socket closed: " + socket.isClosed());
+                            System.out.println("Socket closed: " + socket.isClosed() + "\r\n");
                         });
                 } catch (IOException e){
                     e.printStackTrace();
@@ -49,7 +47,6 @@ public class Server {
             // read only request line for simplicity
             // must be in form GET /path HTTP/1.1
             final var requestLine = in.readLine();
-
             final var parts = requestLine.split(" ");
             final var method = parts[0];
             final var pathQuery = parts[1];
@@ -63,11 +60,12 @@ public class Server {
             }
 
             Request request = new Request();
-            request.setMethod(parts[0]);
+            request.setMethod(method);
 
+            // URLEncodedUtils was Deprecated
             try {
                 var params = URLEncodedUtils.parse(new URI(pathQuery), StandardCharsets.UTF_8);
-                request.setParams(params);
+                request.setParamsForGetMethod(params);
             } catch (URISyntaxException e) {
                 e.printStackTrace();
             }
@@ -84,21 +82,44 @@ public class Server {
 
             var valueContentType = request.getHeaderValueByKey("Content-Type");
             System.out.println("VALUE_CONTENT_TYPE: " + valueContentType);
+
             if (valueContentType != null) {
                 switch (valueContentType.trim()) {
                     case "application/x-www-form-urlencoded":
-                        StringBuilder sb = new StringBuilder();
+                        sb.setLength(0);
+
+                        while (in.ready()) {
+                            sb.append((char) in.read());
+                        }
+
+                        // В этом case зависает на in.readLine()
+                        /*while (in.ready()) {
+                            String lineDecoding = URLDecoder.decode(in.readLine(), StandardCharsets.UTF_8);
+                            sb.append(lineDecoding);
+                        }*/
+
+                        String[] parseBody = sb.toString().split(Pattern.quote("&"));
+                        for (String s : parseBody) {
+                            String[] split = URLDecoder.decode(s, StandardCharsets.UTF_8).split("=");
+                            if (split.length > 1) {
+                                request.addPostParam(split[0], split[1]);
+                            } else {
+                                badRequest(out);
+                                return;
+                            }
+                        }
+                        break;
+                    case "multipart/form-data":
+                        sb.setLength(0);
+
                         while (in.ready()) {
                             sb.append(in.readLine());
                         }
-                        var parseBody = sb.toString().split(Pattern.quote("&"));
-                        for (String s : parseBody) {
-                            var split = s.split("=");
-                            request.addPostParam(split[0], split[1]);
-                        }
+
+                        System.out.println(sb.toString());
+
                         break;
                     default:
-                        System.out.println("DEFAULT");
                         while (in.ready()) {
                             request.addBody(in.readLine());
                         }
@@ -110,11 +131,6 @@ public class Server {
                 }
             }
 
-
-
-
-            System.out.println(request.toString());
-
             handlers.entrySet().stream()
                     .filter(s -> s.getKey().equals(method))
                     .map(Map.Entry::getValue)
@@ -124,7 +140,6 @@ public class Server {
                             s -> s.get(pathWithoutQuery).handle(request, out),
                             () -> pageNotFound(out)
                     );
-
             out.flush();
 
         } catch (IOException e) {
@@ -150,12 +165,25 @@ public class Server {
     public void pageNotFound(BufferedOutputStream responseStream) {
         try {
             responseStream.write(
-                    ("HTTP/1.1 404 Not Found" + "\r\n" +
+                    (HTTP_VERSION + " 404 Not Found" + "\r\n" +
                             "Content-Length: 0" + "\r\n" +
                             "Connection: close" + "\r\n" +
                             "\r\n").getBytes()
             );
             responseStream.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void badRequest(BufferedOutputStream responseStream) {
+        try {
+            responseStream.write(
+                    (HTTP_VERSION + " 400 Bad Request" + "\r\n" +
+                            "Content-Length: 0" + "\r\n" +
+                            "Connection: close" + "\r\n" +
+                            "\r\n").getBytes()
+            );
         } catch (IOException e) {
             e.printStackTrace();
         }

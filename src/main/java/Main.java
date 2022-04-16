@@ -7,7 +7,7 @@ public class Main {
         server.addHandler("GET", "/messages", (request, responseStream) -> {
             StringBuilder jsonResponse = new StringBuilder();
             jsonResponse.append("{\"method\": \"GET\"");
-            if (request.hasParams()) {
+            if (request.hasGetParams()) {
                 jsonResponse.append(", \"params\": [");
 
                 var params = request.getQueryParams();
@@ -42,6 +42,7 @@ public class Main {
         });
 
         server.addHandler("POST", "/messages", ((request, responseStream) -> {
+            System.out.println(request);
             var response = "{\"method\": \"POST\"}";
 
             try {

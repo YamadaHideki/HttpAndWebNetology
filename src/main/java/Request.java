@@ -8,8 +8,8 @@ public class Request {
     private String method;
     private Map<String, String> headers = new HashMap<>();
     private final StringBuilder body = new StringBuilder();
-    private List<NameValuePair> params = new ArrayList<>();
-    private List<NameValuePair> postParams = new ArrayList<>();
+    private List<NameValuePair> paramsForGetMethod = new ArrayList<>();
+    private List<NameValuePair> paramsForPostMethod = new ArrayList<>();
 
     public void setMethod(String method) {
         this.method = method;
@@ -31,16 +31,16 @@ public class Request {
         body.append(s);
     }
 
-    public void setParams(List<NameValuePair> params) {
-        this.params = params;
+    public void setParamsForGetMethod(List<NameValuePair> paramsForGetMethod) {
+        this.paramsForGetMethod = paramsForGetMethod;
     }
 
-    public void setPostParams(List<NameValuePair> postParams) {
-        this.postParams = postParams;
+    public void setParamsForPostMethod(List<NameValuePair> paramsForPostMethod) {
+        this.paramsForPostMethod = paramsForPostMethod;
     }
 
     public void addPostParam(String k, String v) {
-        postParams.add(new BasicNameValuePair(k, v));
+        paramsForPostMethod.add(new BasicNameValuePair(k, v));
     }
 
     public String getHeaderValueByKey(String k) {
@@ -52,6 +52,22 @@ public class Request {
     }
 
     public String getQueryParam(String name) {
+        return getParam(name, paramsForGetMethod);
+    }
+
+    public List<NameValuePair> getQueryParams() {
+        return paramsForGetMethod;
+    }
+
+    public String getPostParam(String name) {
+        return getParam(name, paramsForPostMethod);
+    }
+
+    public List<NameValuePair> getPostParams() {
+        return paramsForPostMethod;
+    }
+
+    private String getParam(String name, List<NameValuePair> params) {
         var value = params.stream()
                 .filter(s -> s.getName().equals(name))
                 .findFirst()
@@ -59,20 +75,8 @@ public class Request {
         return value != null ? value.getValue() : null;
     }
 
-    public List<NameValuePair> getQueryParams() {
-        return params;
-    }
-
-    public void getPostParam(String name) {
-
-    }
-
-    public void getPostParams() {
-
-    }
-
-    public boolean hasParams() {
-        return params.size() > 0;
+    public boolean hasGetParams() {
+        return paramsForGetMethod.size() > 0;
     }
 
     @Override
@@ -86,9 +90,11 @@ public class Request {
         sb.append(body.toString());
 
         sb.append("\r\n} \r\nGET Params: {\r\n");
-        params.forEach((s) -> sb.append(s.getName()).append(": ").append(s.getValue()).append("\r\n"));
+        paramsForGetMethod.forEach((s) -> sb.append(s.getName()).append(": ").append(s.getValue()).append("\r\n"));
+
         sb.append("} \r\nPOST Params: {\r\n");
-        postParams.forEach((s) -> sb.append(s.getName()).append(": ").append(s.getValue()).append("\r\n"));
+        paramsForPostMethod.forEach((s) -> sb.append(s.getName()).append(": ").append(s.getValue()).append("\r\n"));
+
         sb.append("}\r\n");
 
         return sb.toString();
