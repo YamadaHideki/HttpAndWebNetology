@@ -1,8 +1,5 @@
-import org.apache.commons.fileupload.FileItemIterator;
-import org.apache.commons.fileupload.FileItemStream;
-import org.apache.commons.fileupload.FileUploadException;
-import org.apache.commons.fileupload.RequestContext;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.fileupload.*;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.util.Streams;
 import org.apache.hc.core5.net.URLEncodedUtils;
 
@@ -126,8 +123,10 @@ public class Server {
                             request.addBody(in.readLine());
                         }
 
-                        ServletFileUpload upload = new ServletFileUpload();
-                        // Parse the request
+                        FileUpload upload = new FileUpload(new DiskFileItemFactory());
+
+                        /* Итератор возвращается пустой, не могу понять причину. Через debug смотрел, вроде все данные забирает и кодировку,
+                        * и длину файла и байтовый массив body */
                         FileItemIterator iter = upload.getItemIterator(request);
                         while (iter.hasNext()) {
                             FileItemStream item = iter.next();
@@ -142,9 +141,6 @@ public class Server {
                                 // Process the input stream
                             }
                         }
-
-                        //System.out.println(sb.toString());
-
                         break;
                     default:
                         while (in.ready()) {
@@ -169,9 +165,7 @@ public class Server {
                     );
             out.flush();
 
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (FileUploadException e) {
+        } catch (IOException | FileUploadException e) {
             e.printStackTrace();
         }
     }
