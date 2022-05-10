@@ -1,16 +1,21 @@
 import org.apache.hc.core5.http.NameValuePair;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class Request {
 
     private String method;
-    private Map<String, String> headers = new HashMap<>();
-    private final StringBuilder sb = new StringBuilder();
-    private List<NameValuePair> params = new ArrayList<>();
+    private final StringBuilder body;
+    private Map<String, String> headers;
+    private List<NameValuePair> params;
+
+    public Request(String method, Map<String, String> headers, List<NameValuePair> params, StringBuilder body) {
+        this.method = method;
+        this.headers = headers;
+        this.params = params;
+        this.body = body;
+    }
 
     public void setMethod(String method) {
         this.method = method;
@@ -29,19 +34,17 @@ public class Request {
     }
 
     public void addBody(String s) {
-        sb.append(s);
+        body.append(s);
     }
 
     public void setParams(List<NameValuePair> params) {
         this.params = params;
     }
 
-    public String getQueryParam(String name) {
-        var value = params.stream()
+    public List<NameValuePair> getQueryParam(String name) {
+        return params.stream()
                 .filter(s -> s.getName().equals(name))
-                .findFirst()
-                .orElse(null);
-        return value != null ? value.getValue() : null;
+                .collect(Collectors.toList());
     }
 
     public List<NameValuePair> getQueryParams() {
@@ -50,5 +53,9 @@ public class Request {
 
     public boolean hasParams() {
         return params.size() > 0;
+    }
+
+    public boolean doQualityCheck() {
+        return method != null && headers != null && params != null;
     }
 }

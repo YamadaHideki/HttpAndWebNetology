@@ -1,4 +1,4 @@
-import org.apache.hc.core5.net.URLEncodedUtils;
+import org.apache.hc.core5.net.URIBuilder;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -8,13 +8,14 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 public class Server {
     private final ExecutorService pool = Executors.newFixedThreadPool(64);
-    private final Map<String, Map<String, MyHandler>> handlers = new HashMap<>();
+    private final Map<String, Map<String, MyHandler>> handlers = new ConcurrentHashMap<>();
 
     public Server() {
         handlers.put("GET", new HashMap<>());
@@ -61,29 +62,32 @@ public class Server {
                 return;
             }
 
-            Request request = new Request();
-            request.setMethod(parts[0]);
+            //Request request = new Request();
+            var requestBuilder = new RequestBuilder();
+            requestBuilder.setMethod(parts[0]);
 
             try {
-                var params = URLEncodedUtils.parse(new URI(pathQuery), StandardCharsets.UTF_8);
-                request.setParams(params);
+                var params = new URIBuilder(new URI(pathQuery), StandardCharsets.UTF_8).getQueryParams();
+                requestBuilder.setParams(params);
             } catch (URISyntaxException e) {
                 e.printStackTrace();
             }
 
             // обработка headers
+            Map<String, String> headers = new HashMap<>();
             while (in.ready()) {
                 String line = in.readLine();
                 if (line.equals("")) {
                     break;
                 }
                 var lineAsKeyValue = line.split(":");
-                request.addHeader(lineAsKeyValue[0], lineAsKeyValue[1]);
+                headers.put(lineAsKeyValue[0], lineAsKeyValue[1]);
             }
+            requestBuilder.setHeaders(headers);
 
             // обработка body
             while (in.ready()) {
-                request.addBody(in.readLine());
+                requestBuilder.addBody(in.readLine());
             }
 
             handlers.entrySet().stream()
@@ -92,7 +96,7 @@ public class Server {
                     .findAny()
                     .filter(s -> s.containsKey(pathWithoutQuery))
                     .ifPresentOrElse(
-                            s -> s.get(pathWithoutQuery).handle(request, out),
+                            s -> s.get(pathWithoutQuery).handle(requestBuilder.build(), out),
                             () -> pageNotFound(out)
                     );
 
