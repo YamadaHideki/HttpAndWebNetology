@@ -1,17 +1,20 @@
-import org.apache.hc.core5.net.URLEncodedUtils;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.hc.core5.net.URIBuilder;
 
 import java.io.*;
 import java.net.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 public class Server {
     private final ExecutorService pool = Executors.newFixedThreadPool(64);
-    private final Map<String, Map<String, MyHandler>> handlers = new HashMap<>();
+    private final Map<String, Map<String, MyHandler>> handlers = new ConcurrentHashMap<>();
     private final String HTTP_VERSION = "HTTP/1.1";
     private final StringBuilder sb = new StringBuilder();
 
@@ -59,28 +62,31 @@ public class Server {
                 return;
             }
 
-            Request request = new Request();
-            request.setMethod(method);
+            //Request request = new Request();
+            var requestBuilder = new RequestBuilder();
+            requestBuilder.setMethod(method);
 
-            // URLEncodedUtils was Deprecated
             try {
-                var params = URLEncodedUtils.parse(new URI(pathQuery), StandardCharsets.UTF_8);
-                request.setParamsForGetMethod(params);
+                var queryParams = new URIBuilder(new URI(pathQuery), StandardCharsets.UTF_8).getQueryParams();
+                requestBuilder.setParamsForGetMethod(queryParams);
             } catch (URISyntaxException e) {
                 e.printStackTrace();
             }
 
             // обработка headers
+            Map<String, String> headers = new HashMap<>();
             while (in.ready()) {
                 String line = in.readLine();
                 if (line.equals("")) {
                     break;
                 }
                 var lineAsKeyValue = line.split(":");
-                request.addHeader(lineAsKeyValue[0], lineAsKeyValue[1]);
+                headers.put(lineAsKeyValue[0], lineAsKeyValue[1]);
             }
+            requestBuilder.setHeaders(headers);
 
-            var valueContentType = request.getHeaderValueByKey("Content-Type");
+            //var valueContentType = request.getHeaderValueByKey("Content-Type");
+            String valueContentType = headers.get("Content-Type");
             System.out.println("VALUE_CONTENT_TYPE: " + valueContentType);
 
             if (valueContentType != null) {
@@ -99,15 +105,17 @@ public class Server {
                         }*/
 
                         String[] parseBody = sb.toString().split(Pattern.quote("&"));
+                        List<NameValuePair> postParams = new ArrayList<>();
                         for (String s : parseBody) {
                             String[] split = URLDecoder.decode(s, StandardCharsets.UTF_8).split("=");
                             if (split.length > 1) {
-                                request.addPostParam(split[0], split[1]);
+                                postParams.add(new BasicNameValuePair(split[0], split[1]));
                             } else {
                                 badRequest(out);
                                 return;
                             }
                         }
+                        requestBuilder.setParamsForPostMethod(postParams);
                         break;
                     case "multipart/form-data":
                         sb.setLength(0);
@@ -121,13 +129,13 @@ public class Server {
                         break;
                     default:
                         while (in.ready()) {
-                            request.addBody(in.readLine());
+                            requestBuilder.addBody(in.readLine());
                         }
                         break;
                 }
             } else {
                 while (in.ready()) {
-                    request.addBody(in.readLine());
+                    requestBuilder.addBody(in.readLine());
                 }
             }
 
@@ -137,7 +145,7 @@ public class Server {
                     .findAny()
                     .filter(s -> s.containsKey(pathWithoutQuery))
                     .ifPresentOrElse(
-                            s -> s.get(pathWithoutQuery).handle(request, out),
+                            s -> s.get(pathWithoutQuery).handle(requestBuilder.build(), out),
                             () -> pageNotFound(out)
                     );
             out.flush();

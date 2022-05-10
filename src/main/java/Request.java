@@ -2,14 +2,24 @@ import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Request {
 
     private String method;
-    private Map<String, String> headers = new HashMap<>();
-    private final StringBuilder body = new StringBuilder();
-    private List<NameValuePair> paramsForGetMethod = new ArrayList<>();
-    private List<NameValuePair> paramsForPostMethod = new ArrayList<>();
+
+    private Map<String, String> headers;
+    private final StringBuilder body;
+    private List<NameValuePair> paramsForGetMethod;
+    private List<NameValuePair> paramsForPostMethod;
+
+    public Request(String method, Map<String, String> headers, List<NameValuePair> paramsForGetMethod, List<NameValuePair> paramsForPostMethod, StringBuilder body) {
+        this.method = method;
+        this.headers = headers;
+        this.paramsForGetMethod = paramsForGetMethod;
+        this.paramsForPostMethod = paramsForPostMethod;
+        this.body = body;
+    }
 
     public void setMethod(String method) {
         this.method = method;
@@ -51,28 +61,24 @@ public class Request {
         return value != null ? value.getValue() : null;
     }
 
-    public String getQueryParam(String name) {
-        return getParam(name, paramsForGetMethod);
-    }
-
     public List<NameValuePair> getQueryParams() {
         return paramsForGetMethod;
     }
 
-    public String getPostParam(String name) {
-        return getParam(name, paramsForPostMethod);
+    public List<NameValuePair> getPostParam(String name) {
+        return paramsForPostMethod.stream()
+                .filter(s -> s.getName().equals(name))
+                .collect(Collectors.toList());
     }
 
     public List<NameValuePair> getPostParams() {
         return paramsForPostMethod;
     }
 
-    private String getParam(String name, List<NameValuePair> params) {
-        var value = params.stream()
+    public List<NameValuePair> getQueryParam(String name) {
+        return paramsForGetMethod.stream()
                 .filter(s -> s.getName().equals(name))
-                .findFirst()
-                .orElse(null);
-        return value != null ? value.getValue() : null;
+                .collect(Collectors.toList());
     }
 
     public boolean hasGetParams() {
@@ -98,5 +104,9 @@ public class Request {
         sb.append("}\r\n");
 
         return sb.toString();
+    }
+
+    public boolean doQualityCheck() {
+        return method != null && headers != null && paramsForGetMethod != null && paramsForPostMethod != null && body != null;
     }
 }
