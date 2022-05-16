@@ -126,11 +126,12 @@ public class Server {
                         FileUpload upload = new FileUpload(new DiskFileItemFactory());
 
                         /* Итератор возвращается пустой, не могу понять причину. Через debug смотрел, вроде все данные забирает и кодировку,
-                        * и длину файла и байтовый массив body */
+                        * и длину файла и байтовый массив body, while (iter.hasNext()) - неотрабатывает */
                         FileItemIterator iter = upload.getItemIterator(request);
                         while (iter.hasNext()) {
                             FileItemStream item = iter.next();
                             String name = item.getFieldName();
+                            System.out.println(name);
                             InputStream stream = item.openStream();
                             if (item.isFormField()) {
                                 System.out.println("Form field " + name + " with value "
